@@ -14,6 +14,20 @@ pip install git+git://github.com/lehduong/torch-warmup-lr.git
 ```
 
 ### Usage
+Simple add a wrapper after constructing `lr_scheduler` object:
+
+```python
+optim = SGD(model, 0.1)
+scheduler = StepLR(optim, step_size=10, gamma=0.1)
+scheduler = WarmupLR(scheduler, init_lr=0.01, num_warmup=3, warmup_strategy='cos')
+```
+
++ `init_lr`: learning rate will increase from this value to the initialized learning rate in optimizer (in this case 0.01 -> 0.1).
++ `num_warmup`: number of steps for warming up learning rate.
++ `warmup_strategy`: function that learning rate will gradually increase according to. Currently support **cos**, **linear**, **constant** - learning rate will be fixed and equals to *init_lr* during warm-up phase).
+
+### Example
+Below is a runnable example of `WarmupLR`:
 ```python
 import torch
 import numpy as np 

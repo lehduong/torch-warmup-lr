@@ -1,11 +1,12 @@
-# Pytorch Scheduler wrapper for learning rate warmup
+# Pytorch Scheduler wrapper support learning rate warmup
 
-A lightweight wrapper around the DeepMind Control Suite that provides the standard OpenAI Gym interface. The wrapper allows to specify the following:
-* Reliable random seed initialization that will ensure deterministic behaviour.
-* Setting ```from_pixels=True``` converts proprioceptive observations into image-based. In additional, you can choose the image dimensions, by setting ```height``` and ```width```.
-* Action space normalization bound each action's coordinate into the ```[-1, 1]``` range.
-* Setting ```frame_skip``` argument lets to perform action repeat.
+A wrapper around the Pytorch learning rate scheduler for warming up learning rate. The wrapper allows to specify the following:
+* Standard interface
+* Access to lr_scheduler object's attributes 
+* Different strategies for warming up learning rate
+* Load and save state dict
 
+<img src="asset/output.png" alt="visualizing learning rate with cosine warmup" width="400">
 
 ### Instalation
 ```
@@ -15,26 +16,44 @@ pip install git+git://github.com/lehduong/torch-warmup-lr.git
 ### Usage
 ```python
 import torch
-from torch.optim.lr_scheduler import StepLR, ExponentialLR
-from torch.optim.sgd import SGD
-
+import numpy as np 
+import sys
+sys.path.append('..')
 from torch_warmup_lr import WarmupLR
+from torch.optim import SGD
+from torch.optim.lr_scheduler import StepLR, ExponentialLR, MultiStepLR, ReduceLROnPlateau
 
 
 if __name__ == '__main__':
-    model = [torch.nn.Parameter(torch.randn(2, 2, requires_grad=True))]
+    model = [torch.nn.Parameter(torch.randn(1, 1, requires_grad=True))]
     optim = SGD(model, 0.1)
 
-    # scheduler_warmup is chained with schduler_steplr
+    # Choose different scheduler to test
     scheduler = StepLR(optim, step_size=10, gamma=0.1)
-    scheduler = WarmupLR(scheduler)
+    scheduler = MultiStepLR(optim, milestones=[3,6,9], gamma=0.1)
+    scheduler = ReduceLROnPlateau(optim, threshold=0.99, mode='min', patience=2, cooldown=5)
+    # wrapping the scheduler
+    # strategy could be one of ['cos', 'linear', 'constant']
+    scheduler = WarmupLR(scheduler, init_lr=0.01, num_warmup=3, warmup_strategy='cos')
 
     # this zero gradient update is needed to avoid a warning message, issue #8.
     optim.zero_grad()
     optim.step()
 
+    # The wrapper doesn't alter wrapped scheduler interface
+    # Simply plug and play
     for epoch in range(1, 20):
-        scheduler.step()
-        print(epoch, optim.param_groups[0]['lr'])
+        # step with pseudo loss if we're using reducelronplateau
+        if isinstance(scheduler._scheduler, ReduceLROnPlateau):
+            pseudo_loss = 20-epoch
+            scheduler.step(pseudo_loss)
+            print('Epoch: {} LR: {:.3f} pseudo loss: {:.2f}'.format(epoch, optim.param_groups[0]['lr'], pseudo_loss))
+        # step without any parameters
+        else:
+            scheduler.step()
+            print(epoch, optim.param_groups[0]['lr'])
         optim.step()    # backward pass (update network)
+
+    # get scheduler attribute
+    print(lr_scheduler.cooldown_counter)
 ```

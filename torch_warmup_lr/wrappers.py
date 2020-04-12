@@ -25,6 +25,26 @@ class WarmupLR(_LRScheduler):
 
     def __getattr__(self, name):
         return getattr(self._scheduler, name)
+    
+    def state_dict(self):
+        """Returns the state of the scheduler as a :class:`dict`.
+
+        It contains an entry for every variable in self.__dict__ which
+        is not the optimizer.
+        """
+        wrapper_state_dict = {key: value for key, value in self.__dict__.items() if (key != 'optimizer' and key !='_scheduler')}
+        wrapped_state_dict = {key: value for key, value in self._scheduler.__dict__.items() if key != 'optimizer'} 
+        return {'wrapped': wrapped_state_dict, 'wrapper': wrapper_state_dict}
+    
+    def load_state_dict(self, state_dict):
+        """Loads the schedulers state.
+        Arguments:
+            state_dict (dict): scheduler state. Should be an object returned
+                from a call to :meth:`state_dict`.
+        """
+        self.__dict__.update(state_dict['wrapper'])
+        self._scheduler.__dict__.update(state_dict['wrapped'])
+
 
     def _format_param(self):
         # learning rate of each param group will increase
